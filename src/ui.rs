@@ -8,12 +8,13 @@ use std::{
     thread,
 };
 
-use chrono::{Days, NaiveDate, Utc};
+use chrono::{NaiveDate, Utc};
 use iced::{
     executor,
-    widget::{button, text, Column},
+    widget::{text, Button, Column, Text},
     Application, Command, Element, Settings, Theme,
 };
+use iced_aw::date_picker::Date;
 
 use crate::{
     bitcoin::BitcoinAmount, dollar::DollarAmount, historical_data::get_prices_from_csv,
@@ -22,6 +23,7 @@ use crate::{
 
 pub struct WhatIf {
     amount: Option<DollarAmount>,
+    show_date_picker: bool,
     start_date: Option<NaiveDate>,
     conversion_table: Arc<RwLock<HashMap<NaiveDate, (DollarAmount, BitcoinAmount)>>>,
     send_channel: Sender<NaiveDate>,
@@ -32,10 +34,6 @@ impl WhatIf {
         let amount = self.amount?.dollars();
         let start_date = self.start_date?;
         let conversion_table = self.conversion_table.read().ok()?;
-        println!(
-            "Conversion table contains {} records.",
-            conversion_table.len()
-        );
         let (usd, sats) = conversion_table.get(&start_date)?;
         println!("Found the date's rates: {} = {}", usd, sats);
 
@@ -48,14 +46,9 @@ impl WhatIf {
     pub fn current_usd_value(&self) -> Option<DollarAmount> {
         let sats = self.bitcoin_amount()?.sats();
         let today = Utc::now().date_naive();
-        let yesterday = today.checked_sub_days(Days::new(1))?;
         let conversion_table = self.conversion_table.read().ok()?;
-        println!(
-            "Conversion table contains {} records",
-            conversion_table.len()
-        );
-        let (usd, sats_rate) = conversion_table.get(&yesterday)?;
-        println!("Found yesterday's rates: {} = {}", usd, sats_rate);
+        let (usd, sats_rate) = conversion_table.get(&today)?;
+        println!("Found today's rates: {} = {}", usd, sats_rate);
 
         sats.checked_mul(usd.dollars())
             .and_then(|usd| usd.checked_div(sats_rate.sats()))
@@ -73,7 +66,8 @@ impl WhatIf {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Message {
-    DateSelected(NaiveDate),
+    ToggleDatePicker(bool),
+    DateSelected(Date),
     AmountUpdated(Option<u64>),
 }
 
@@ -128,6 +122,7 @@ impl Application for WhatIf {
         (
             WhatIf {
                 amount: None,
+                show_date_picker: false,
                 start_date: None,
                 conversion_table,
                 send_channel,
@@ -142,7 +137,9 @@ impl Application for WhatIf {
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
+            Message::AmountUpdated(amount) => self.amount = amount.map(DollarAmount::from),
             Message::DateSelected(date) => {
+                let date = NaiveDate::from(date);
                 self.start_date = Some(date);
                 self.send_channel
                     .send(date)
@@ -152,7 +149,7 @@ impl Application for WhatIf {
                     })
                     .unwrap(); // TODO handle unwrap?
             }
-            Message::AmountUpdated(amount) => self.amount = amount.map(DollarAmount::from),
+            Message::ToggleDatePicker(toggle) => self.show_date_picker = toggle,
         }
         Command::none()
     }
@@ -163,10 +160,13 @@ impl Application for WhatIf {
             .spacing(10)
             .padding(10)
             .align_items(iced::Alignment::Center)
-            .push(button("Date").on_press(Message::DateSelected(
-                // TODO date selector
-                NaiveDate::from_ymd_opt(2019, 1, 1).unwrap_or_default(),
-            )))
+            .push(iced_aw::date_picker(
+                self.show_date_picker,
+                NaiveDate::from_ymd_opt(2019, 1, 1).unwrap(),
+                Button::new(Text::new("Date")).on_press(Message::ToggleDatePicker(true)),
+                Message::ToggleDatePicker(false),
+                Message::DateSelected,
+            ))
             .push(numeric_input(
                 self.amount.map(DollarAmount::dollars),
                 10_000,
@@ -174,12 +174,33 @@ impl Application for WhatIf {
             ))
             .push_maybe(
                 self.amount
-                    .map(DollarAmount::from)
+                    .and_then(|amt| {
+                        self.start_date.and_then(|date| {
+                            self.bitcoin_amount().map(|btc| {
+                                format!(
+                                    "If you converted your entire net worth of {amt} into {btc} on {date}"
+                                )
+                            })
+                        })
+                    })
+                    .map(text)
+                    .map(|e| e.size(30)),
+            )
+            // .push_maybe(
+            //     self.bitcoin_amount()
+            //         .map(|amt| format!("You would have {amt}"))
+            //         .map(text)
+            //         .map(|e| e.size(30)),
+            // )
+            // .push(text(
+            //     "(Historical data from https://www.investing.com/crypto/bitcoin/historical-data)",
+            // ))
+            .push_maybe(
+                self.current_usd_value()
+                    .map(|amt| format!("Your net worth today would be {amt}"))
                     .map(text)
                     .map(|e| e.size(50)),
             )
-            .push_maybe(self.bitcoin_amount().map(text).map(|e| e.size(50)))
-            .push_maybe(self.current_usd_value().map(text).map(|e| e.size(100)))
             .into()
     }
 }

@@ -1095,6 +1095,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "iced_aw"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "129deba9897243dd59c2038e2267a691e392c94e569680066ee63b1164429490"
+dependencies = [
+ "cfg-if",
+ "chrono",
+ "iced",
+ "once_cell",
+]
+
+[[package]]
 name = "iced_core"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2870,6 +2882,7 @@ dependencies = [
  "chrono",
  "csv",
  "iced",
+ "iced_aw",
  "serde",
 ]
 
