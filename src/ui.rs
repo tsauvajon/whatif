@@ -11,8 +11,8 @@ use std::{
 use chrono::{NaiveDate, Utc};
 use iced::{
     executor,
-    widget::{text, Button, Column, Text},
-    Application, Command, Element, Settings, Theme,
+    widget::{text, Button, Column, Container, Text},
+    Application, Command, Element, Length, Settings, Theme,
 };
 use iced_aw::date_picker::Date;
 
@@ -141,6 +141,7 @@ impl Application for WhatIf {
             Message::DateSelected(date) => {
                 let date = NaiveDate::from(date);
                 self.start_date = Some(date);
+                self.show_date_picker = false;
                 self.send_channel
                     .send(date)
                     .map_err(|err| {
@@ -155,7 +156,7 @@ impl Application for WhatIf {
     }
 
     fn view(&self) -> Element<Self::Message> {
-        Column::new()
+        let col = Column::new()
             .max_width(600)
             .spacing(10)
             .padding(10)
@@ -200,7 +201,13 @@ impl Application for WhatIf {
                     .map(|amt| format!("Your net worth today would be {amt}"))
                     .map(text)
                     .map(|e| e.size(50)),
-            )
+            );
+
+        Container::new(col)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x()
+            .center_y()
             .into()
     }
 }
