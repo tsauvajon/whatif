@@ -33,6 +33,14 @@ impl From<u64> for DollarAmount {
     }
 }
 
+impl From<f64> for DollarAmount {
+    fn from(dollars: f64) -> Self {
+        DollarAmount {
+            dollars: dollars as u64,
+        }
+    }
+}
+
 fn separate_thousands(amount: u64) -> Vec<u64> {
     let mut remainder = amount;
     let mut acc = vec![];

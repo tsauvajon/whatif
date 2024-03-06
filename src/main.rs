@@ -1,5 +1,6 @@
 mod bitcoin;
 mod dollar;
+mod historical_data;
 mod numeric_input;
 mod ui;
 

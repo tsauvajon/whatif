@@ -16,6 +16,10 @@ impl BitcoinAmount {
         Self { sats }
     }
 
+    pub fn one_btc() -> Self {
+        Self { sats: SATS_IN_BTC }
+    }
+
     pub fn sats(&self) -> u64 {
         self.sats
     }
