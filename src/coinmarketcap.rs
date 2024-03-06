@@ -1,3 +1,4 @@
+//! Client to fetch the latest BTC/USD quote from CoinMarketCap
 use std::collections::HashMap;
 
 use reqwest::{

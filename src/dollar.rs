@@ -1,3 +1,4 @@
+//! Human readable dollar amounts
 use std::fmt::Display;
 
 #[derive(Copy, Clone)]

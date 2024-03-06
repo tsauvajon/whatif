@@ -1,3 +1,5 @@
+//! Human readable Bitcoin amounts, following some of the guidelines from
+//! https://bitcoin.design/guide/designing-products/units-and-symbols/
 use std::fmt::Display;
 
 /// Minimum amount of sats to display the ₿ symbol

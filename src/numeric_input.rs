@@ -1,3 +1,6 @@
+//! Numeric input field (like an HTML <input type="number" />) for `iced`, with
+//! configurable - and + buttons.
+
 use iced::{
     alignment::{self, Alignment},
     widget::{button, component, row, text, text_input, Component},

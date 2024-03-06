@@ -1,3 +1,4 @@
+//! Join things together in an iced UI.
 use std::{
     collections::HashMap,
     fs::File,
