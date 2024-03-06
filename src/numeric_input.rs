@@ -5,15 +5,15 @@ use iced::{
 };
 
 pub struct NumericInput<Message> {
-    value: Option<u32>,
-    step: u32,
-    on_change: Box<dyn Fn(Option<u32>) -> Message>,
+    value: Option<u64>,
+    step: u64,
+    on_change: Box<dyn Fn(Option<u64>) -> Message>,
 }
 
 pub fn numeric_input<Message>(
-    value: Option<u32>,
-    step: u32,
-    on_change: impl Fn(Option<u32>) -> Message + 'static,
+    value: Option<u64>,
+    step: u64,
+    on_change: impl Fn(Option<u64>) -> Message + 'static,
 ) -> NumericInput<Message> {
     NumericInput::new(value, step, on_change)
 }
@@ -27,9 +27,9 @@ pub enum Event {
 
 impl<Message> NumericInput<Message> {
     pub fn new(
-        value: Option<u32>,
-        step: u32,
-        on_change: impl Fn(Option<u32>) -> Message + 'static,
+        value: Option<u64>,
+        step: u64,
+        on_change: impl Fn(Option<u64>) -> Message + 'static,
     ) -> Self {
         Self {
             value,
@@ -81,7 +81,7 @@ impl<Message> Component<Message> for NumericInput<Message> {
                 "Type a number",
                 self.value
                     .as_ref()
-                    .map(u32::to_string)
+                    .map(u64::to_string)
                     .as_deref()
                     .unwrap_or(""),
             )

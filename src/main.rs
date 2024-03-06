@@ -1,9 +1,8 @@
-use calculator::WhatIf;
-
 mod bitcoin;
-mod calculator;
+mod dollar;
 mod numeric_input;
+mod ui;
 
 pub fn main() -> iced::Result {
-    WhatIf::start()
+    ui::WhatIf::start()
 }
