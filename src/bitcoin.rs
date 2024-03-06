@@ -10,7 +10,7 @@ struct BitcoinAmount {
 
 // TODO:
 // https://bitcoin.design/guide/designing-products/units-and-symbols/
-// Separate thousands, alternate coloring, use a monospace font, using trailing zeroes
+// Separate alternate coloring, use a monospace font
 impl BitcoinAmount {
     fn from(sats: u64) -> Self {
         Self { sats }
@@ -36,7 +36,7 @@ fn separate_thousands(amount: u64) -> Vec<u64> {
     acc
 }
 
-/// Under 1M sats -> sats only
+/// Under 1M sats -> sats only.
 /// Else: ₿ with sats thousands.
 impl Display for BitcoinAmount {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -57,16 +57,13 @@ impl Display for BitcoinAmount {
                 0 => 0.to_string(),
                 1 => btc_thousands[0].to_string(),
                 _ => {
+                    // Don't pad the first thousands block
                     let (head, tail) = btc_thousands.split_at(1);
-                    let head = head
-                        .iter()
+                    head.iter()
                         .map(ToString::to_string)
-                        .collect::<Vec<String>>();
-                    let tail = tail
-                        .iter()
-                        .map(|v| format!("{v:03}"))
-                        .collect::<Vec<String>>();
-                    vec![head, tail].concat().join(" ")
+                        .chain(tail.iter().map(|thousand| format!("{thousand:03}")))
+                        .collect::<Vec<String>>()
+                        .join(" ")
                 }
             };
 
