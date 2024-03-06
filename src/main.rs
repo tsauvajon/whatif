@@ -1,4 +1,5 @@
 mod bitcoin;
+mod coinmarketcap;
 mod dollar;
 mod historical_data;
 mod numeric_input;
