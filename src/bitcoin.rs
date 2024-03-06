@@ -4,7 +4,7 @@ use std::fmt::Display;
 const B_DISPLAY_THRESHOLD: u64 = 1_000_000;
 const SATS_IN_BTC: u64 = 100_000_000;
 
-struct BitcoinAmount {
+pub struct BitcoinAmount {
     sats: u64,
 }
 
@@ -12,8 +12,12 @@ struct BitcoinAmount {
 // https://bitcoin.design/guide/designing-products/units-and-symbols/
 // Separate alternate coloring, use a monospace font
 impl BitcoinAmount {
-    fn from(sats: u64) -> Self {
+    pub fn from(sats: u64) -> Self {
         Self { sats }
+    }
+
+    pub fn sats(&self) -> u64 {
+        self.sats
     }
 
     fn split_btc_sats(&self) -> (u64, u64) {

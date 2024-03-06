@@ -5,5 +5,5 @@ mod calculator;
 mod numeric_input;
 
 pub fn main() -> iced::Result {
-    WhatIf::pubrun()
+    WhatIf::start()
 }

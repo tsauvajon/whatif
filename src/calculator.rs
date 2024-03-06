@@ -5,7 +5,7 @@ use iced::{
     Application, Command, Element, Settings, Theme,
 };
 
-use crate::numeric_input::numeric_input;
+use crate::{bitcoin::BitcoinAmount, numeric_input::numeric_input};
 
 pub struct WhatIf {
     pub amount: Option<u32>,
@@ -13,22 +13,22 @@ pub struct WhatIf {
 }
 
 impl WhatIf {
-    pub fn sats_amount(&self) -> Option<u32> {
-        let amount = self.amount?;
+    pub fn bitcoin_amount(&self) -> Option<BitcoinAmount> {
+        let amount = self.amount? as u64;
         let _start_date = self.start_date?;
         let btc_price_then = 1234;
 
-        amount.checked_mul(btc_price_then)
+        amount.checked_mul(btc_price_then).map(BitcoinAmount::from)
     }
 
-    pub fn current_usd_value(&self) -> Option<u32> {
-        let sats = self.sats_amount()?;
+    pub fn current_usd_value(&self) -> Option<u64> {
+        let sats = self.bitcoin_amount()?.sats();
         let btc_price_today = 100;
 
         sats.checked_mul(btc_price_today)
     }
 
-    pub fn pubrun() -> Result<(), iced::Error> {
+    pub fn start() -> Result<(), iced::Error> {
         WhatIf::run(Settings::default())
     }
 }
@@ -78,9 +78,21 @@ impl Application for WhatIf {
             .padding(10)
             .align_items(iced::Alignment::Center)
             .push(numeric_input(self.amount, 10_000, Message::AmountUpdated))
-            .push_maybe(self.amount.map(text).map(|e| e.size(50)))
-            .push_maybe(self.sats_amount().map(text).map(|e| e.size(50)))
-            .push_maybe(self.current_usd_value().map(text).map(|e| e.size(100)))
+            .push_maybe(
+                self.amount
+                    // TODO: proper formatting
+                    .map(|amt| format!("${amt}"))
+                    .map(text)
+                    .map(|e| e.size(50)),
+            )
+            .push_maybe(self.bitcoin_amount().map(text).map(|e| e.size(50)))
+            .push_maybe(
+                self.current_usd_value()
+                    // TODO: proper formatting
+                    .map(|amt| format!("${amt}"))
+                    .map(text)
+                    .map(|e| e.size(100)),
+            )
             .push(button("Date").on_press(Message::DateSelected(NaiveDate::default())));
 
         col.into()
