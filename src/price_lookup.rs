@@ -3,7 +3,6 @@
 //! coindesk.com API. Anything in between will be missing.
 use std::{
     collections::HashMap,
-    fs::File,
     sync::{
         mpsc::{self, Receiver, Sender},
         Arc, RwLock,
@@ -15,6 +14,8 @@ use serde::Deserialize;
 
 use crate::{bitcoin::BitcoinAmount, dollar::DollarAmount, historical_data::get_prices_from_csv};
 
+// Makes it work more easily on WASM + other platforms
+const PRICE_HISTORY: &'static [u8] = include_bytes!("../data/price_history.csv");
 const COINDESK_LATEST_BTC_PRICE: &str = "https://api.coindesk.com/v1/bpi/currentprice/USD.json";
 
 /// Loads Bitcoin prices from different sources so we can look them up
@@ -25,7 +26,6 @@ pub struct PriceDatabase {
 
 #[derive(Debug)]
 pub enum Error {
-    OpenPriceHistoryFile(std::io::Error),
     GetPricesFromCsv(csv::Error),
 }
 
@@ -40,8 +40,7 @@ impl PriceDatabase {
     /// use almost 0 request budget with API providers, and have a ready-to-use
     /// BTC price API for other purposes.
     pub fn start() -> Result<(Self, Receiver<NaiveDate>), Error> {
-        let f = File::open("data/price_history.csv").map_err(Error::OpenPriceHistoryFile)?;
-        let conversion_table = get_prices_from_csv(f).map_err(|err| {
+        let conversion_table = get_prices_from_csv(PRICE_HISTORY).map_err(|err| {
             println!("Loading conversion table: {err:?}");
             Error::GetPricesFromCsv(err)
         })?;
@@ -87,7 +86,7 @@ impl PriceDatabase {
             let database = Arc::clone(&self.data);
             let tx = self.updates_sender.clone();
 
-            tokio::spawn(async move {
+            let fut = async move {
                 // We don't have today's price, let's fetch it!
                 let resp = match reqwest::get(COINDESK_LATEST_BTC_PRICE).await {
                     Ok(resp) => resp,
@@ -119,7 +118,12 @@ impl PriceDatabase {
                         println!("Price database mutex is poisoned: {err}");
                     }
                 };
-            });
+            };
+
+            // #[cfg(target_arch = "wasm32")]
+            // iced::futures::executor::block_on(fut);
+            #[cfg(not(target_arch = "wasm32"))]
+            tokio::spawn(fut);
         }
 
         None
