@@ -1,4 +1,6 @@
-//! Client to fetch the latest BTC/USD quote from CoinMarketCap
+//! Client to fetch the latest BTC/USD quote from CoinMarketCap.
+//! Not currently used in the app, because it would leak the API key. Will need
+//! to have a backend before this is used.
 use std::collections::HashMap;
 
 use reqwest::{

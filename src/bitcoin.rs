@@ -6,6 +6,7 @@ use std::fmt::Display;
 const B_DISPLAY_THRESHOLD: u64 = 1_000_000;
 const SATS_IN_BTC: u64 = 100_000_000;
 
+#[derive(Copy, Clone)]
 pub struct BitcoinAmount {
     sats: u64,
 }

@@ -1,41 +1,33 @@
 //! Join things together in an iced UI.
-use std::{
-    collections::HashMap,
-    fs::File,
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        Arc, RwLock,
-    },
-    thread,
-};
+
+use std::sync::{mpsc::Receiver, Arc, Mutex};
 
 use chrono::{NaiveDate, Utc};
 use iced::{
     executor,
     widget::{text, Button, Column, Container, Text},
-    Application, Command, Element, Length, Settings, Theme,
+    Application, Command, Element, Length, Settings, Subscription, Theme,
 };
 use iced_aw::date_picker::Date;
 
 use crate::{
-    bitcoin::BitcoinAmount, dollar::DollarAmount, historical_data::get_prices_from_csv,
-    numeric_input::numeric_input,
+    bitcoin::BitcoinAmount, dollar::DollarAmount, numeric_input::numeric_input,
+    price_lookup::PriceDatabase,
 };
 
 pub struct WhatIf {
     amount: Option<DollarAmount>,
     show_date_picker: bool,
     start_date: Option<NaiveDate>,
-    conversion_table: Arc<RwLock<HashMap<NaiveDate, (DollarAmount, BitcoinAmount)>>>,
-    send_channel: Sender<NaiveDate>,
+    price_database: PriceDatabase,
+    updates_receiver: Arc<Mutex<Receiver<NaiveDate>>>,
 }
 
 impl WhatIf {
     pub fn bitcoin_amount(&self) -> Option<BitcoinAmount> {
         let amount = self.amount?.dollars();
         let start_date = self.start_date?;
-        let conversion_table = self.conversion_table.read().ok()?;
-        let (usd, sats) = conversion_table.get(&start_date)?;
+        let (usd, sats) = self.price_database.get(start_date)?;
         println!("Found the date's rates: {} = {}", usd, sats);
 
         amount
@@ -47,8 +39,7 @@ impl WhatIf {
     pub fn current_usd_value(&self) -> Option<DollarAmount> {
         let sats = self.bitcoin_amount()?.sats();
         let today = Utc::now().date_naive();
-        let conversion_table = self.conversion_table.read().ok()?;
-        let (usd, sats_rate) = conversion_table.get(&today)?;
+        let (usd, sats_rate) = self.price_database.get(today)?;
         println!("Found today's rates: {} = {}", usd, sats_rate);
 
         sats.checked_mul(usd.dollars())
@@ -69,6 +60,7 @@ impl WhatIf {
 pub enum Message {
     ToggleDatePicker(bool),
     DateSelected(Date),
+    PriceDatabaseUpdated(NaiveDate),
     AmountUpdated(Option<u64>),
 }
 
@@ -79,54 +71,15 @@ impl Application for WhatIf {
     type Theme = Theme;
 
     fn new(_flags: ()) -> (WhatIf, Command<Self::Message>) {
-        let (send_channel, rx): (Sender<NaiveDate>, Receiver<NaiveDate>) = mpsc::channel();
-        let (_tx, receive_channel): (
-            Sender<(NaiveDate, DollarAmount, BitcoinAmount)>,
-            Receiver<(NaiveDate, DollarAmount, BitcoinAmount)>,
-        ) = mpsc::channel();
-
-        let f = File::open("data/price_history.csv").unwrap();
-        let conversion_table = get_prices_from_csv(f)
-            .map_err(|err| {
-                println!("Loading conversion table: {err:?}");
-                err
-            })
-            .unwrap_or_default();
-        println!(
-            "Loaded conversion table with {} records.",
-            conversion_table.len()
-        );
-        let conversion_table = Arc::new(RwLock::new(conversion_table));
-
-        {
-            let conversion_table = Arc::clone(&conversion_table);
-            thread::spawn(move || loop {
-                let Ok((date, usd, sats)) = receive_channel.recv() else {
-                    break;
-                };
-
-                let Ok(mut table) = conversion_table.write() else {
-                    break;
-                };
-                table.insert(date, (usd, sats));
-            });
-        }
-
-        thread::spawn(move || loop {
-            if let Ok(date) = rx.recv() {
-                println!("Received date {date:?}");
-            } else {
-                break;
-            }
-        });
+        let (price_database, updates_receiver) = PriceDatabase::start().unwrap();
 
         (
             WhatIf {
                 amount: None,
                 show_date_picker: false,
                 start_date: None,
-                conversion_table,
-                send_channel,
+                price_database,
+                updates_receiver: Arc::new(Mutex::new(updates_receiver)),
             },
             Command::none(),
         )
@@ -136,21 +89,26 @@ impl Application for WhatIf {
         String::from("What if...")
     }
 
+    // https://stackoverflow.com/a/75689667
+    fn subscription(&self) -> Subscription<Message> {
+        iced::subscription::unfold(
+            "price database updated",
+            self.updates_receiver.clone(),
+            move |receiver| async move {
+                let date = receiver.lock().unwrap().recv().unwrap();
+                (Message::PriceDatabaseUpdated(date), receiver)
+            },
+        )
+    }
+
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
             Message::AmountUpdated(amount) => self.amount = amount.map(DollarAmount::from),
             Message::DateSelected(date) => {
-                let date = NaiveDate::from(date);
-                self.start_date = Some(date);
                 self.show_date_picker = false;
-                self.send_channel
-                    .send(date)
-                    .map_err(|err| {
-                        println!("{err:?}");
-                        err
-                    })
-                    .unwrap(); // TODO handle unwrap?
+                self.start_date = Some(NaiveDate::from(date));
             }
+            Message::PriceDatabaseUpdated(_) => (), // Just trigger an update but nothing else to do
             Message::ToggleDatePicker(toggle) => self.show_date_picker = toggle,
         }
         Command::none()
@@ -188,15 +146,6 @@ impl Application for WhatIf {
                     .map(text)
                     .map(|e| e.size(30)),
             )
-            // .push_maybe(
-            //     self.bitcoin_amount()
-            //         .map(|amt| format!("You would have {amt}"))
-            //         .map(text)
-            //         .map(|e| e.size(30)),
-            // )
-            // .push(text(
-            //     "(Historical data from https://www.investing.com/crypto/bitcoin/historical-data)",
-            // ))
             .push_maybe(
                 self.current_usd_value()
                     .map(|amt| format!("Your net worth today would be {amt}"))
@@ -210,5 +159,9 @@ impl Application for WhatIf {
             .center_x()
             .center_y()
             .into()
+    }
+
+    fn theme(&self) -> Theme {
+        Theme::Dark
     }
 }
